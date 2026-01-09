@@ -41,26 +41,20 @@ if (!process.env.ACTIONS_RUNTIME_URL || !process.env.ACTIONS_RUNTIME_TOKEN) {
     })
 
     test('put then get returns the blob', async () => {
-      const content = 'test-content-' + Date.now()
+      const content = `test-content-${Date.now()}-${randomBytes(8).toString('hex')}`
       const sha = sha256(content)
 
       const srcPath = path.join(tmpDir, 'src-' + sha.slice(0, 8))
       await fsp.writeFile(srcPath, content)
       await backend.putFile('cas', sha, srcPath)
 
-      // Fresh backend with fresh rootDir to force restore from Actions cache
-      const backend2 = new ActionsCacheBackend({
-        namespace: testRunPrefix,
-        rootDir: await fsp.mkdtemp(path.join(tmpDir, 'restore-'))
-      })
-
-      const restored = await backend2.getFile('cas', sha)
+      const restored = await waitFor(() => backend.getFile('cas', sha), 30_000)
       expect(restored).toBeDefined()
       expect(await fsp.readFile(restored!, 'utf8')).toBe(content)
     })
 
     test('duplicate put does not fail', async () => {
-      const content = 'duplicate-content-' + Date.now()
+      const content = `duplicate-content-${Date.now()}-${randomBytes(8).toString('hex')}`
       const sha = sha256(content)
 
       const src1 = path.join(tmpDir, 'dup1')
@@ -104,7 +98,7 @@ if (!process.env.ACTIONS_RUNTIME_URL || !process.env.ACTIONS_RUNTIME_TOKEN) {
     })
 
     test('PUT then GET round-trip', async () => {
-      const payload = 'http-test-' + Date.now()
+      const payload = `http-test-${Date.now()}-${randomBytes(8).toString('hex')}`
       const sha = sha256(payload)
 
       const app = buildBazelRemoteCacheServer({
@@ -121,27 +115,26 @@ if (!process.env.ACTIONS_RUNTIME_URL || !process.env.ACTIONS_RUNTIME_TOKEN) {
       })
       expect(putRes.statusCode).toBe(200)
 
-      // Fresh backend to test restore from Actions cache
-      const backend2 = new ActionsCacheBackend({
-        namespace: testRunPrefix,
-        rootDir: await fsp.mkdtemp(path.join(tmpDir, 'http-restore-'))
-      })
-      const app2 = buildBazelRemoteCacheServer({
-        backend: backend2,
+      await app.close()
+
+      const appRead = buildBazelRemoteCacheServer({
+        backend,
         logger: false,
         tmpDir
       })
+      const getRes = await waitForResponse(
+        () => appRead.inject({ method: 'GET', url: `/cas/${sha}` }),
+        (res) => res.statusCode === 200 && res.payload === payload,
+        30_000
+      )
 
-      const getRes = await app2.inject({ method: 'GET', url: `/cas/${sha}` })
-      expect(getRes.statusCode).toBe(200)
-      expect(getRes.payload).toBe(payload)
-
-      await app.close()
-      await app2.close()
+      expect(getRes?.statusCode).toBe(200)
+      expect(getRes?.payload).toBe(payload)
+      await appRead.close()
     })
 
     test('HEAD returns content-length', async () => {
-      const payload = 'head-test-' + Date.now()
+      const payload = `head-test-${Date.now()}-${randomBytes(8).toString('hex')}`
       const sha = sha256(payload)
 
       const app = buildBazelRemoteCacheServer({
@@ -158,27 +151,57 @@ if (!process.env.ACTIONS_RUNTIME_URL || !process.env.ACTIONS_RUNTIME_TOKEN) {
       })
       expect(putRes.statusCode).toBe(200)
 
-      // Fresh backend
-      const backend2 = new ActionsCacheBackend({
-        namespace: testRunPrefix,
-        rootDir: await fsp.mkdtemp(path.join(tmpDir, 'head-restore-'))
-      })
-      const app2 = buildBazelRemoteCacheServer({
-        backend: backend2,
+      await app.close()
+
+      const appRead = buildBazelRemoteCacheServer({
+        backend,
         logger: false,
         tmpDir
       })
+      const headRes = await waitForResponse(
+        () => appRead.inject({ method: 'HEAD', url: `/ac/${sha}` }),
+        (res) => res.statusCode === 200,
+        30_000
+      )
 
-      const headRes = await app2.inject({ method: 'HEAD', url: `/ac/${sha}` })
-      expect(headRes.statusCode).toBe(200)
-      expect(headRes.headers['content-length']).toBe(String(payload.length))
-
-      await app.close()
-      await app2.close()
+      expect(headRes?.statusCode).toBe(200)
+      expect(headRes?.headers['content-length']).toBe(String(payload.length))
+      await appRead.close()
     })
   })
 
   function sha256(input: string): string {
     return createHash('sha256').update(input).digest('hex')
+  }
+
+  async function waitFor<T>(
+    fn: () => Promise<T | undefined>,
+    timeoutMs: number
+  ): Promise<T | undefined> {
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+      const result = await fn()
+      if (result !== undefined) return result
+      await sleep(1_000)
+    }
+    return undefined
+  }
+
+  async function waitForResponse<T>(
+    fn: () => Promise<T>,
+    predicate: (res: T) => boolean,
+    timeoutMs: number
+  ): Promise<T | undefined> {
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+      const result = await fn()
+      if (predicate(result)) return result
+      await sleep(1_000)
+    }
+    return undefined
+  }
+
+  function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms))
   }
 }

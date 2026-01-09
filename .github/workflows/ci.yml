@@ -83,13 +83,25 @@ jobs:
       - name: Test PUT/GET round-trip
         run: |
           URL=${{ steps.cache-server.outputs.remote_cache_url }}
-          SHA=$(echo -n "test-content-$GITHUB_RUN_ID" | sha256sum | cut -d' ' -f1)
+          PAYLOAD="test-content-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          SHA=$(printf '%s' "$PAYLOAD" | sha256sum | cut -d' ' -f1)
 
           echo "PUT /cas/$SHA"
-          curl -v -f -X PUT "$URL/cas/$SHA" -d "test-content-$GITHUB_RUN_ID"
+          curl -v -f -X PUT "$URL/cas/$SHA" \
+            -H 'content-type: application/octet-stream' \
+            --data-binary "$PAYLOAD"
 
           echo "GET /cas/$SHA"
-          RESULT=$(curl -v -f "$URL/cas/$SHA")
-          [ "$RESULT" = "test-content-$GITHUB_RUN_ID" ] || exit 1
+          for i in $(seq 1 30); do
+            RESULT=$(curl -sS -f "$URL/cas/$SHA" || true)
+            if [ "$RESULT" = "$PAYLOAD" ]; then
+              echo "✓ Cache round-trip successful"
+              exit 0
+            fi
+            echo "not ready yet (attempt $i/30)"
+            sleep 1
+          done
 
-          echo "✓ Cache round-trip successful"
+          echo "GET never returned expected payload"
+          curl -v -f "$URL/cas/$SHA" || true
+          exit 1
