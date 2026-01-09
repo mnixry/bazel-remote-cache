@@ -1,17 +1,9 @@
-# This workflow will lint the entire codebase using the
-# `super-linter/super-linter` action.
-#
-# For more information, see the super-linter repository:
-#     https://github.com/super-linter/super-linter
 name: Lint Codebase
 
 on:
   pull_request:
-    branches:
-      - main
   push:
-    branches:
-      - main
+    branches: [main]
 
 permissions:
   contents: read
@@ -20,35 +12,22 @@ permissions:
 
 jobs:
   lint:
-    name: Lint Codebase
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        id: checkout
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js
-        id: setup-node
-        uses: actions/setup-node@v6
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
           cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Enable Corepack
-        id: corepack
-        run: corepack enable
+      - run: pnpm install --frozen-lockfile
 
-      - name: Install Dependencies
-        id: install
-        run: pnpm install --frozen-lockfile
-
-      - name: Lint Codebase
-        id: super-linter
-        uses: super-linter/super-linter/slim@v8
+      - uses: super-linter/super-linter/slim@v7
         env:
           CHECKOV_FILE_NAME: .checkov.yml
           DEFAULT_BRANCH: main

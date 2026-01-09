@@ -1,69 +1,83 @@
-name: Continuous Integration
+name: CI
 
 on:
   pull_request:
-    branches:
-      - main
   push:
-    branches:
-      - main
+    branches: [main]
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
-  test-typescript:
-    name: TypeScript Tests
+  build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        id: checkout
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        id: setup-node
-        uses: actions/setup-node@v6
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
           cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Enable Corepack
-        id: corepack
-        run: corepack enable
+      - run: pnpm install --frozen-lockfile
 
-      - name: Install Dependencies
-        id: pnpm-install
-        run: pnpm install --frozen-lockfile
+      - run: pnpm run format:check
 
-      - name: Check Format
-        id: pnpm-format-check
-        run: pnpm run format:check
+      - run: pnpm run lint
 
-      - name: Lint
-        id: pnpm-lint
-        run: pnpm run lint
+      - run: pnpm run package
 
-      - name: Test
-        id: pnpm-ci-test
-        run: pnpm run ci-test
-
-  test-action:
-    name: GitHub Actions Test
+  test:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        id: checkout
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - name: Test Local Action
-        id: test-action
-        uses: ./
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
         with:
-          milliseconds: 2000
+          node-version-file: .node-version
+          cache: pnpm
 
-      - name: Print Output
-        id: output
-        run: echo "${{ steps.test-action.outputs.time }}"
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run ci-test
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run package
+
+      - name: Start cache server
+        id: cache-server
+        uses: ./
+
+      - name: Verify server is running
+        run: curl -f ${{ steps.cache-server.outputs.remote_cache_url }}/healthz
+
+      - name: Test PUT/GET round-trip
+        run: |
+          URL=${{ steps.cache-server.outputs.remote_cache_url }}
+          SHA=$(echo -n "test-content" | sha256sum | cut -d' ' -f1)
+
+          # PUT
+          curl -f -X PUT "$URL/cas/$SHA" -d "test-content"
+
+          # GET
+          RESULT=$(curl -f "$URL/cas/$SHA")
+          [ "$RESULT" = "test-content" ] || exit 1
+
+          echo "✓ Cache round-trip successful"
