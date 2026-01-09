@@ -75,7 +75,7 @@ if (!process.env.ACTIONS_RUNTIME_URL || !process.env.ACTIONS_RUNTIME_TOKEN) {
 
   describe('HTTP server', () => {
     test('GET /healthz', async () => {
-      const app = buildBazelRemoteCacheServer({ backend, logger: false })
+      const app = buildBazelRemoteCacheServer({ backend, logger: true })
       const res = await app.inject({ method: 'GET', url: '/healthz' })
       expect(res.statusCode).toBe(200)
       expect(res.json().status).toBe('ok')
@@ -83,14 +83,14 @@ if (!process.env.ACTIONS_RUNTIME_URL || !process.env.ACTIONS_RUNTIME_TOKEN) {
     })
 
     test('invalid sha returns 400', async () => {
-      const app = buildBazelRemoteCacheServer({ backend, logger: false })
+      const app = buildBazelRemoteCacheServer({ backend, logger: true })
       const res = await app.inject({ method: 'GET', url: '/cas/bad-sha' })
       expect(res.statusCode).toBe(400)
       await app.close()
     })
 
     test('missing blob returns 404', async () => {
-      const app = buildBazelRemoteCacheServer({ backend, logger: false })
+      const app = buildBazelRemoteCacheServer({ backend, logger: true })
       const sha = randomBytes(32).toString('hex')
       const res = await app.inject({ method: 'GET', url: `/cas/${sha}` })
       expect(res.statusCode).toBe(404)
@@ -103,7 +103,7 @@ if (!process.env.ACTIONS_RUNTIME_URL || !process.env.ACTIONS_RUNTIME_TOKEN) {
 
       const app = buildBazelRemoteCacheServer({
         backend,
-        logger: false,
+        logger: true,
         tmpDir
       })
 
@@ -119,7 +119,7 @@ if (!process.env.ACTIONS_RUNTIME_URL || !process.env.ACTIONS_RUNTIME_TOKEN) {
 
       const appRead = buildBazelRemoteCacheServer({
         backend,
-        logger: false,
+        logger: true,
         tmpDir
       })
       const getRes = await waitForResponse(
@@ -139,7 +139,7 @@ if (!process.env.ACTIONS_RUNTIME_URL || !process.env.ACTIONS_RUNTIME_TOKEN) {
 
       const app = buildBazelRemoteCacheServer({
         backend,
-        logger: false,
+        logger: true,
         tmpDir
       })
 
@@ -155,7 +155,7 @@ if (!process.env.ACTIONS_RUNTIME_URL || !process.env.ACTIONS_RUNTIME_TOKEN) {
 
       const appRead = buildBazelRemoteCacheServer({
         backend,
-        logger: false,
+        logger: true,
         tmpDir
       })
       const headRes = await waitForResponse(
