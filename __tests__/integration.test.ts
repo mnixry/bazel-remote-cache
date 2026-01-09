@@ -1,7 +1,7 @@
 import * as fsp from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, createHash } from 'node:crypto'
 
 import { jest } from '@jest/globals'
 
@@ -41,14 +41,14 @@ if (!process.env.ACTIONS_RUNTIME_URL || !process.env.ACTIONS_RUNTIME_TOKEN) {
     })
 
     test('put then get returns the blob', async () => {
-      const sha = randomSha('put-get')
       const content = 'test-content-' + Date.now()
+      const sha = sha256(content)
 
-      const srcPath = path.join(tmpDir, 'src-' + sha)
+      const srcPath = path.join(tmpDir, 'src-' + sha.slice(0, 8))
       await fsp.writeFile(srcPath, content)
       await backend.putFile('cas', sha, srcPath)
 
-      // Use fresh backend to force restore from Actions cache
+      // Fresh backend with fresh rootDir to force restore from Actions cache
       const backend2 = new ActionsCacheBackend({
         namespace: testRunPrefix,
         rootDir: await fsp.mkdtemp(path.join(tmpDir, 'restore-'))
@@ -60,8 +60,8 @@ if (!process.env.ACTIONS_RUNTIME_URL || !process.env.ACTIONS_RUNTIME_TOKEN) {
     })
 
     test('duplicate put does not fail', async () => {
-      const sha = randomSha('dup')
-      const content = 'duplicate-content'
+      const content = 'duplicate-content-' + Date.now()
+      const sha = sha256(content)
 
       const src1 = path.join(tmpDir, 'dup1')
       const src2 = path.join(tmpDir, 'dup2')
@@ -73,7 +73,7 @@ if (!process.env.ACTIONS_RUNTIME_URL || !process.env.ACTIONS_RUNTIME_TOKEN) {
     })
 
     test('get missing returns undefined', async () => {
-      const sha = randomSha('missing')
+      const sha = randomBytes(32).toString('hex')
       const result = await backend.getFile('cas', sha)
       expect(result).toBeUndefined()
     })
@@ -97,20 +97,21 @@ if (!process.env.ACTIONS_RUNTIME_URL || !process.env.ACTIONS_RUNTIME_TOKEN) {
 
     test('missing blob returns 404', async () => {
       const app = buildBazelRemoteCacheServer({ backend, logger: false })
-      const sha = randomSha('404')
+      const sha = randomBytes(32).toString('hex')
       const res = await app.inject({ method: 'GET', url: `/cas/${sha}` })
       expect(res.statusCode).toBe(404)
       await app.close()
     })
 
     test('PUT then GET round-trip', async () => {
+      const payload = 'http-test-' + Date.now()
+      const sha = sha256(payload)
+
       const app = buildBazelRemoteCacheServer({
         backend,
         logger: false,
         tmpDir
       })
-      const sha = randomSha('http')
-      const payload = 'http-test-payload'
 
       const putRes = await app.inject({
         method: 'PUT',
@@ -140,20 +141,22 @@ if (!process.env.ACTIONS_RUNTIME_URL || !process.env.ACTIONS_RUNTIME_TOKEN) {
     })
 
     test('HEAD returns content-length', async () => {
+      const payload = 'head-test-' + Date.now()
+      const sha = sha256(payload)
+
       const app = buildBazelRemoteCacheServer({
         backend,
         logger: false,
         tmpDir
       })
-      const sha = randomSha('head')
-      const payload = 'head-test'
 
-      await app.inject({
+      const putRes = await app.inject({
         method: 'PUT',
         url: `/ac/${sha}`,
         payload,
         headers: { 'content-type': 'application/octet-stream' }
       })
+      expect(putRes.statusCode).toBe(200)
 
       // Fresh backend
       const backend2 = new ActionsCacheBackend({
@@ -175,9 +178,7 @@ if (!process.env.ACTIONS_RUNTIME_URL || !process.env.ACTIONS_RUNTIME_TOKEN) {
     })
   })
 
-  function randomSha(prefix: string): string {
-    const rand = randomBytes(28).toString('hex')
-    const tag = prefix.padEnd(8, '0').slice(0, 8)
-    return tag + rand
+  function sha256(input: string): string {
+    return createHash('sha256').update(input).digest('hex')
   }
 }
