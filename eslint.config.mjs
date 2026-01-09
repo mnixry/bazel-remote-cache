@@ -1,3 +1,4 @@
+// @ts-check
 // See: https://eslint.org/docs/latest/use/configure/configuration-files
 
 import { fixupPluginRules } from '@eslint/compat'

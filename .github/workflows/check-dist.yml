@@ -35,19 +35,24 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .node-version
-          cache: npm
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Enable Corepack
+        id: corepack
+        run: corepack enable
 
       - name: Remove dist/ Directory
         id: remove-dist
-        run: npx rimraf ./dist
+        run: pnpm dlx rimraf dist/
 
       - name: Install Dependencies
         id: install
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build dist/ Directory
         id: build
-        run: npm run bundle
+        run: pnpm run bundle
 
       # This will fail the workflow if the `dist/` directory is different than
       # expected.

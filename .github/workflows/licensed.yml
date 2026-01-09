@@ -34,11 +34,16 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .node-version
-          cache: npm
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Enable Corepack
+        id: corepack
+        run: corepack enable
 
       - name: Install Dependencies
-        id: npm-ci
-        run: npm ci
+        id: pnpm-install
+        run: pnpm install --frozen-lockfile
 
       - name: Setup Ruby
         id: setup-ruby

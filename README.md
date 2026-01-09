@@ -50,19 +50,20 @@ need to perform some initial setup steps before you can develop your action.
 1. :hammer_and_wrench: Install the dependencies
 
    ```bash
-   npm install
+   corepack enable
+   pnpm install
    ```
 
 1. :building_construction: Package the TypeScript for distribution
 
    ```bash
-   npm run bundle
+   pnpm run bundle
    ```
 
 1. :white_check_mark: Run the tests
 
    ```bash
-   $ npm test
+   $ pnpm test
 
    PASS  ./index.test.js
      ✓ throws invalid number (3ms)
@@ -121,7 +122,7 @@ So, what are you waiting for? Go ahead and start customizing your action!
 1. Format, test, and build the action
 
    ```bash
-   npm run all
+   pnpm run all
    ```
 
    > This step is important! It will run [`rollup`](https://rollupjs.org/) to
@@ -146,8 +147,8 @@ So, what are you waiting for? Go ahead and start customizing your action!
    - Terminal/Command Prompt
 
      ```bash
-     # npx @github/local action <action-yaml-path> <entrypoint> <dotenv-file>
-     npx @github/local-action . src/main.ts .env
+     # pnpm exec local-action <action-yaml-path> <entrypoint> <dotenv-file>
+     pnpm exec local-action . src/main.ts .env
      ```
 
    You can provide a `.env` file to the `local-action` CLI to set environment
