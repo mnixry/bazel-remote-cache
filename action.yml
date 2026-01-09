@@ -1,24 +1,43 @@
-name: The name of your action here
-description: Provide a description here
-author: Your name or organization here
+name: Bazel remote cache (GitHub Actions Cache)
+description:
+  Run a Bazel Remote Caching HTTP server in your workflow, backed by
+  @actions/cache.
+author: mix
 
 # Add your action's branding here. This will appear on the GitHub Marketplace.
 branding:
-  icon: heart
-  color: red
+  icon: zap
+  color: gray-dark
 
-# Define your inputs here.
 inputs:
-  milliseconds:
-    description: Your input description here
-    required: true
-    default: '1000'
+  host:
+    description: Host interface to bind the HTTP server to.
+    required: false
+    default: 127.0.0.1
+  port:
+    description: TCP port to bind the HTTP server to.
+    required: false
+    default: '7777'
+  namespace:
+    description: Namespace prefix for @actions/cache keys.
+    required: false
+    default: bazel-remote-cache
+  health_timeout_ms:
+    description: Startup health check timeout in milliseconds.
+    required: false
+    default: '15000'
+  log_level:
+    description: Log level (fatal|error|warn|info|debug|trace).
+    required: false
+    default: info
 
 # Define your outputs here.
 outputs:
-  time:
-    description: Your output description here
+  remote_cache_url:
+    description: Base URL for Bazel --remote_cache.
 
 runs:
   using: node24
   main: dist/index.js
+  post: dist/post.js
+  post-if: always()

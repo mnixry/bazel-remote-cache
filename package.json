@@ -37,7 +37,10 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@actions/core": "^2.0.2"
+    "@actions/cache": "^5.0.2",
+    "@actions/core": "^2.0.2",
+    "fastify": "^5.6.2",
+    "p-limit": "^7.2.0"
   },
   "devDependencies": {
     "@eslint/compat": "^2.0.1",
@@ -46,6 +49,7 @@
     "@github/local-action": "^6.0.2",
     "@jest/globals": "^30.2.0",
     "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-typescript": "^12.3.0",
     "@types/jest": "^30.0.0",
